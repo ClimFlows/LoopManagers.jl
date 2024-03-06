@@ -1,11 +1,9 @@
-import HostCPUFeatures # for : pick_vector_width
-
 """
-    abstract type SingleCPU<:HostBackend end
-Parent type for backend executing on a single core. Derived types should specialize
+    abstract type SingleCPU<:HostManager end
+Parent type for manager executing on a single core. Derived types should specialize
 `distribute`[@ref] or `offload_single` and leave `offload`[@ref] as it is.
 """
-abstract type SingleCPU<:HostBackend end
+abstract type SingleCPU<:HostManager end
 
 @inline function offload(fun::Fun, b::SingleCPU, range, args::VArgs{NA}) where {Fun<:Function, NA}
     @inline offload_single(fun, b, range, args, 1,1)
@@ -18,8 +16,8 @@ function offload_single(fun::Fun, b::SingleCPU, range, args, NT, id) where {Fun<
 end
 
 """
-    backend = PlainCPU()
-Backend for sequential execution on the CPU. LLVM will try to vectorize loops marked with `@simd`.
+    manager = PlainCPU()
+Manager for sequential execution on the CPU. LLVM will try to vectorize loops marked with `@simd`.
 This works mostly for simple loops and arithmetic computations.
 For Julia-side vectorization, especially of mathematical functions, see `VectorizedCPU'.
 """
@@ -38,14 +36,14 @@ end
 @inline distribute_plain((ri,rj,rk)::Range3, NT, id) = (ri, rj, distribute_plain(rk,NT,id))
 
 """
-    backend = VectorizedCPU()
+    manager = VectorizedCPU()
 
-Returns a backend for executing loops with optional explicit SIMD vectorization. Only inner loops
-marked with `@vec` will use explicit vectorization. If this causes errors, use `@simd` instead of `@vec`. 
+Returns a manager for executing loops with optional explicit SIMD vectorization. Only inner loops
+marked with `@vec` will use explicit vectorization. If this causes errors, use `@simd` instead of `@vec`.
 Vectorization of loops marked with `@simd` is left to the Julia/LLVM compiler, as with PlainCPU.
 
 !!! note
-    [`no_simd(::VectorizedCPU)`](@ref GFLoops.no_simd) returns a `PlainCPU`.
+    [`no_simd(::VectorizedCPU)`](@ref ManagedLoops.no_simd) returns a `PlainCPU`.
 """
 struct VectorizedCPU{VLen} <: SingleCPU end
 
@@ -106,8 +104,8 @@ end
 @inline next_item(stop, next) = (next <= stop) ? (next, next) : nothing
 
 # @vec iteration
-GFLoops.bulk(range::VecRange{N}) where N = VecBulk{N}(range.start, range.vstop)
-GFLoops.tail(range::VecRange) = range.vstop:range.stop
+ManagedLoops.bulk(range::VecRange{N}) where N = VecBulk{N}(range.start, range.vstop)
+ManagedLoops.tail(range::VecRange) = range.vstop:range.stop
 
 struct VecBulk{N}
     start::Int

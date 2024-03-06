@@ -1,29 +1,29 @@
-const Backends = Vector{HostBackend}
+# const Managers = Vector{HostManager}
 
 struct TunedCall
     scores::Vector{Float64}
 end
 TunedCall(n::Int) = TunedCall(zeros(n))
 
-struct Tune <: GFLoops.HostBackend
-    backends::Vector{HostBackend}
+struct Tune <: ManagedLoops.HostManager
+    backends::Vector{HostManager}
     calls::Dict{Any,TunedCall}
 end
 
 tune(backends) = Tune(backends, Dict{Any, TunedCall}())
 
 function tune()
-    avx(vlen) = GFBackends.VectorizedCPU(vlen)
-    threaded(vlen) = GFBackends.MultiThread(avx(vlen))
+    avx(vlen) = LoopManagers.VectorizedCPU(vlen)
+    threaded(vlen) = LoopManagers.MultiThread(avx(vlen))
     backends = ([threaded(vlen), avx(vlen)] for vlen in (8, 16, 32))
     return Tune(vcat(backends...), Dict{Any, TunedCall}())
 end
 
-# implementation of GFLoops API
+# implementation of ManagedLoops API
 
-GFLoops.parallel(fun, b::Tune) = fun(b)
+ManagedLoops.parallel(fun, b::Tune) = fun(b)
 
-function GFLoops.offload(fun::Fun, b::Tune, range, args::Vararg{Any,N}) where {Fun<:Function, N}
+function ManagedLoops.offload(fun::Fun, b::Tune, range, args::Vararg{Any,N}) where {Fun<:Function, N}
     (; backends, calls) = b
     sig = (fun, range, signature(args))
     if !(sig in keys(calls))
@@ -59,7 +59,7 @@ end
 
 function sample(picked, scores, backend, fun::Fun, range, args) where Fun
     start = time_ns()
-    GFLoops.offload(fun, backend, range, args...)
+    ManagedLoops.offload(fun, backend, range, args...)
     elapsed = (time_ns()-start)*1e-9
     scores[picked] += elapsed^(-2)
     return nothing

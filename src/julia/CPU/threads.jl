@@ -1,8 +1,8 @@
 """
-    backend = MultiThread(b=PlainCPU(), nt=Threads.nthreads())
+    manager = MultiThread(b=PlainCPU(), nt=Threads.nthreads())
 
-Returns a multithread backend derived from `cpu_backend`, with a fork-join pattern.
-When `backend` is passed to [`offload`](@ref), `backend.nthreads` threads are spawn (fork).
+Returns a multithread manager derived from `cpu_manager`, with a fork-join pattern.
+When `manager` is passed to [`offload`](@ref), `manager.nthreads` threads are spawn (fork).
 They each work on a subset of indices. Progress continues only after all threads have finished (join),
 so that `barrier` is not needed between two uses of `offload` and does nothing.
 
@@ -11,8 +11,8 @@ so that `barrier` is not needed between two uses of `offload` and does nothing.
     The simplest way is probably to set `JULIA_EXCLUSIVE=1` before launching Julia.
     See also [Julia Discourse](https://discourse.julialang.org/t/compact-vs-scattered-pinning/69722)
 """
-struct MultiThread{Backend<:SingleCPU} <: HostBackend 
-    b::Backend
+struct MultiThread{Manager<:SingleCPU} <: HostManager
+    b::Manager
     nthreads::Int
     MultiThread(b::B=PlainCPU(), nt=Threads.nthreads()) where B = new{B}(b, nt)
 end
@@ -22,11 +22,11 @@ struct Args{T}
     args::T
 end
 
-function offload(fun::Fun, backend::MultiThread, range, args::VArgs{NA}) where {Fun<:Function, NA}
+function offload(fun::Fun, manager::MultiThread, range, args::VArgs{NA}) where {Fun<:Function, NA}
     check_boxed_variables(fun)
     args = Args(args)
-    @Polyester.batch for id=1:backend.nthreads
-        offload_single(fun, backend.b, range, args.args, backend.nthreads, id)
+    @Polyester.batch for id=1:manager.nthreads
+        offload_single(fun, manager.b, range, args.args, manager.nthreads, id)
     end
 end
 
@@ -37,72 +37,72 @@ struct ConditionBarrier
 end
 
 """
-    backend = MainThread(cpu_backend=PlainCPU())
+    manager = MainThread(cpu_manager=PlainCPU())
 
-Returns a multithread backend derived from `cpu_backend`, initially in sequential mode.
-In this mode, `backend` behaves exactly like `cpu_backend`.
-When `backend` is passed to [`parallel`](@ref), `Threads.nthreads()` threads are spawn. 
-`backend` switches to parallel mode while the threads are running. 
-When passed to `offload` by these threads, `backend` behaves like `cpu_backend`,
-except that the outer loop is distributed among threads. 
-Furthermore [`barrier`](@ref) and [`share`](@ref) 
+Returns a multithread manager derived from `cpu_manager`, initially in sequential mode.
+In this mode, `manager` behaves exactly like `cpu_manager`.
+When `manager` is passed to [`parallel`](@ref), `Threads.nthreads()` threads are spawn.
+`manager` switches to parallel mode while the threads are running.
+When passed to `offload` by these threads, `manager` behaves like `cpu_manager`,
+except that the outer loop is distributed among threads.
+Furthermore [`barrier`](@ref) and [`share`](@ref)
 allow synchronisation and data-sharing across threads.
 
 ```julia
 multi = MultiThread()
-parallel(multi) do backend
-    x = share(randn, backend)
+parallel(multi) do manager
+    x = share(randn, manager)
     println("Thread \$(Threads.threadid()) has drawn \$x.")
 end
 ```
 """
-struct MainThread{Backend} <: HostBackend
+struct MainThread{Manager} <: HostManager
     cbarrier  :: ConditionBarrier
-    backend :: Backend
+    manager :: Manager
 end
-MainThread(backend=PlainCPU()) = MainThread(ConditionBarrier(), backend)
+MainThread(manager=PlainCPU()) = MainThread(ConditionBarrier(), manager)
 
-@inline function no_simd(thread::MainThread) 
-    (; cbarrier, backend) = thread
-    return MainThread(cbarrier, no_simd(backend))
+@inline function no_simd(thread::MainThread)
+    (; cbarrier, manager) = thread
+    return MainThread(cbarrier, no_simd(manager))
 end
 
 # It is crucial to store the thread id in the WorkThread because
 # there is no guarantee that Threads.threadid() remains the same over the lifetime
 # of the thread. When two successive loops have the same loop range,
-# relying on Threadid() can lead to the same thread computing over different parts 
+# relying on Threadid() can lead to the same thread computing over different parts
 # of the range. In the absence of a barrier between the loops
 # (which should not be necessary), incorrect data may be read in the second loop.
 
-struct WorkThread{Backend} <: ComputeBackend
+struct WorkThread{Manager} <: HostManager
     cbarrier  :: ConditionBarrier
-    backend :: Backend
+    manager :: Manager
     N :: Int
     id :: Int
 end
 
 @inline function no_simd(thread::WorkThread)
-    (; cbarrier, backend, N, id) = thread
-    return WorkThread(cbarrier, no_simd(backend), N,id)
+    (; cbarrier, manager, N, id) = thread
+    return WorkThread(cbarrier, no_simd(manager), N,id)
 end
 
 @inline function offload(fun::Fun, thread::MainThread, ranges, args::Vararg{Any,N}) where {Fun<:Function, N}
-    @inline offload_single(fun, thread.backend, ranges, args, 1, 1)
+    @inline offload_single(fun, thread.manager, ranges, args, 1, 1)
 end
 
 @inline function offload(fun::Fun, thread::WorkThread, ranges, args::Vararg{Any,N}) where {Fun<:Function, N}
-    @inline offload_single(fun, thread.backend, ranges, args, thread.N, thread.id)
+    @inline offload_single(fun, thread.manager, ranges, args, thread.N, thread.id)
 end
 
 #============== parallel, barrier, share ==============#
 
-parallel(::Any, thread::WorkThread) = error("Nested used of GFLoops.parallel is forbidden.")
+parallel(::Any, thread::WorkThread) = error("Nested used of ManagedLoops.parallel is forbidden.")
 
 function parallel(main::Fun, thread::MainThread, args::Vararg{Any,N}) where {Fun,N}
     thread.cbarrier.arrived[]=(0,0,:open) # reset barrier
     Threads.@threads for id=1:Threads.nthreads()
-        (; cbarrier, backend) = thread
-        thread = WorkThread(cbarrier, backend, Threads.nthreads(), id)
+        (; cbarrier, manager) = thread
+        thread = WorkThread(cbarrier, manager, Threads.nthreads(), id)
         main(thread, args...)
     end
     return nothing
@@ -117,8 +117,8 @@ end
 function master(fun::Fun, thread::WorkThread, args::Vararg{Any,N}) where {Fun,N}
     barrier(thread)
     if thread.id == 1
-        backend = thread.backend
-        fun(backend, args...)
+        manager = thread.manager
+        fun(manager, args...)
     end
     barrier(thread)
     return nothing
@@ -151,7 +151,7 @@ function wait_condition_barrier(cb::ConditionBarrier, size, id, there)
         arrived_new = arrived_old+1
         if (arrived_new>1) && (there_old != there)
             err = """
-            Race condition detected. Thread $id is waiting at : 
+            Race condition detected. Thread $id is waiting at :
                 $there
             while thread $id_old is waiting at :
                 $there_old

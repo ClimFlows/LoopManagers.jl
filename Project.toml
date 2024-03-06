@@ -4,6 +4,9 @@ authors = ["The ClimFlows contributors"]
 version = "1.0.0-DEV"
 
 [deps]
+HostCPUFeatures = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
+ManagedLoops = "36a4119d-6b73-4371-88fe-ba2d91f5495d"
+Polyester = "f517fe37-dbe3-4b94-8317-1923a5111588"
 SIMD = "fdea26ae-647d-5447-a871-4b548cad5224"
 SIMDMathFunctions = "1eef466b-9549-4fab-8fa4-831d4db0c7cf"
 
@@ -14,6 +17,11 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 KA_Ext = "KernelAbstractions"
 
 [compat]
+HostCPUFeatures = "0.1"
+ManagedLoops = "0.1"
+Polyester = "0.7"
+SIMD = "3.4"
+SIMDMathFunctions = "0.1"
 julia = "1.8"
 
 [extras]
