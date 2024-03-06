@@ -3,6 +3,16 @@ uuid = "d33d4f76-8fbe-47a6-acd9-ead534c583ff"
 authors = ["The ClimFlows contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+SIMD = "fdea26ae-647d-5447-a871-4b548cad5224"
+SIMDMathFunctions = "1eef466b-9549-4fab-8fa4-831d4db0c7cf"
+
+[weakdeps]
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+
+[extensions]
+KA_Ext = "KernelAbstractions"
+
 [compat]
 julia = "1.8"
 
