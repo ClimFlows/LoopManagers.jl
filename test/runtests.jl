@@ -23,16 +23,27 @@ function test(mgr, b)
     return nothing
 end
 
+@testset "OpenMP-like manager" begin
+    main = LoopManagers.MainThread()
+    LoopManagers.parallel(main) do worker
+        x = LoopManagers.share(worker) do
+            randn()
+        end
+        println("Thread $(Threads.threadid()) has drawn $x.")
+    end
+    @test true
+end
+
 managers = Any[
     nothing,
     LoopManagers.PlainCPU(),
     LoopManagers.VectorizedCPU(),
     LoopManagers.MultiThread(),
-    LoopManagers.MultiThread(VectorizedCPU(4)),
+    LoopManagers.MultiThread(VectorizedCPU()),
+    LoopManagers.MainThread(VectorizedCPU()),
 ]
 
-@testset "LoopManagers.jl" begin
-    # Write your tests here.
+@testset "SIMD and fork-join managers" begin
     let b = randn(1024, 1024)
         for mgr in managers
             test(mgr, b)

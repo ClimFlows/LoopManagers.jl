@@ -1,7 +1,7 @@
 """
     abstract type SingleCPU<:HostManager end
 Parent type for manager executing on a single core. Derived types should specialize
-`distribute`[@ref] or `offload_single` and leave `offload`[@ref] as it is.
+`distribute`[@ref] or `offload_single`[@ref] and leave `offload` as it is.
 """
 abstract type SingleCPU<:HostManager end
 
@@ -50,7 +50,7 @@ struct VectorizedCPU{VLen} <: SingleCPU end
 const N32 = Int64(HostCPUFeatures.pick_vector_width(Float32))
 
 VectorizedCPU(len=N32) = VectorizedCPU{len}()
-
+Base.show(io::IO, ::VectorizedCPU{VLen}) where VLen= print(io, "VectorizedCPU($VLen)")
 """
 Divide work among vectorized CPU threads.
 """

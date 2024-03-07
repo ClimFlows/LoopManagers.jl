@@ -4,7 +4,7 @@ performance portability module `ManagedLoops`. It implements the API functions d
 Currently supported are SIMD and/or multithreaded execution on the CPU. Offloading to GPU via CUDA and oneAPI is experimental.
 
 Additional iteration/offloading strategies (e.g. cache-friendly iteration) can be implemented by defining
-new manager types and implementing specialized versions of [`forall`](@ref) and [`offload`](@ref).
+new manager types and implementing specialized versions of `ManagedLoops.offload`.
 """
 module LoopManagers
 
