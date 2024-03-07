@@ -9,7 +9,7 @@ new manager types and implementing specialized versions of [`forall`](@ref) and 
 module LoopManagers
 
 using ManagedLoops
-import ManagedLoops: offload, to_device, parallel, barrier, master, share
+import ManagedLoops: offload, parallel, barrier, master, share
 
 export PlainCPU, MultiThreadCPU, VectorizedCPU, MultiThreadSIMD
 export CUDA_GPU, oneAPI_GPU
@@ -33,7 +33,7 @@ import Polyester # for threads.jl
 
 # helper functions
 include("julia/check_closure.jl")
-include("julia/strict_float.jl")
+# include("julia/strict_float.jl")
 
 # CPU managers
 include("julia/CPU/simd.jl")

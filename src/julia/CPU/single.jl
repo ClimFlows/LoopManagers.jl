@@ -9,8 +9,8 @@ abstract type SingleCPU<:HostManager end
     @inline offload_single(fun, b, range, args, 1,1)
 end
 
-function offload_single(fun::Fun, b::SingleCPU, range, args, NT, id) where {Fun<:Function}
-    check_boxed_variables(fun)
+@inline function offload_single(fun::Fun, b::SingleCPU, range, args, NT, id) where {Fun<:Function}
+#    check_boxed_variables(fun)
     drange = distribute(range, b, NT, id)
     @inline fun(drange, args...)
 end

@@ -4,33 +4,30 @@ using Test
 
 @loops function loop!(_, fun, a, b)
     let (irange, jrange) = axes(a)
-        @inbounds for j in jrange
-            for i in irange
+        @inbounds @vec for i in irange, j in jrange
                 a[i,j] = fun(b[i,j])
-            end
         end
     end
 end
 
-function test(mgr, fun, b)
+function test(mgr, b)
     a = similar(b)
     @info mgr
-    loop!(mgr, fun, a, b)
-    @time loop!(mgr, fun, a, b)
+    loop!(mgr, exp, a, b)
+    @time loop!(mgr, exp, a, b)
     return b
 end
 
 managers = Any[nothing, LoopManagers.PlainCPU(),
     LoopManagers.VectorizedCPU(),
     LoopManagers.MultiThread(),
-    LoopManagers.MultiThread(VectorizedCPU()),
-    LoopManagers.PlainCPU()]
+    LoopManagers.MultiThread(VectorizedCPU(4)) ]
 
 @testset "LoopManagers.jl" begin
     # Write your tests here.
-    let fun = exp, b=randn(100,100)
+    let b=randn(1000,1000)
         for mgr in managers
-            test(mgr, fun, b)
+            test(mgr, b)
             @test true
         end
     end
