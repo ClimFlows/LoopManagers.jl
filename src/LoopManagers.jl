@@ -29,6 +29,7 @@ const Range3{I,J,K} = Tuple{I,J,K}
 @inline call_single_index((i,j,k)::Range3, fun, args) = fun(((i,),(j,),(k,)), args...)
 
 import HostCPUFeatures # for single.jl
+import SIMD # for single.jl
 import Polyester # for threads.jl
 
 # helper functions
@@ -36,7 +37,7 @@ include("julia/check_closure.jl")
 # include("julia/strict_float.jl")
 
 # CPU managers
-include("julia/CPU/simd.jl")
+# include("julia/CPU/simd.jl")
 include("julia/CPU/single.jl")
 include("julia/CPU/threads.jl")
 
