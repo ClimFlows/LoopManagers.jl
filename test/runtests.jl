@@ -1,6 +1,7 @@
 using LoopManagers
 using ManagedLoops: @loops, @vec
 using SIMDMathFunctions
+using KernelAbstractions
 
 using InteractiveUtils: versioninfo, @code_native
 using Chairmarks: @be

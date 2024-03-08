@@ -2,10 +2,10 @@ module KA_Ext
 
 using KernelAbstractions
 
-using LoopManagers: LoopManagers, DeviceBackend, Range1, Range2
-import ManagedLoops: offload
+using LoopManagers: LoopManagers, Range1, Range2
+import ManagedLoops: offload, DeviceManager
 
-struct KA_GPU{A, G} <: DeviceBackend
+struct KA_GPU{A, G} <: DeviceManager
     gpu::G
 end
 LoopManagers.KernelAbstractions_GPU(gpu::G, A) where G = KA_GPU{A,G}(gpu)
