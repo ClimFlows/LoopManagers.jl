@@ -9,6 +9,10 @@ struct Tune <: ManagedLoops.HostManager
     backends::Vector{HostManager}
     calls::Dict{Any,TunedCall}
 end
+function Base.show(io::IO, mgr::Tune)
+    mgrs = join(("$mgr" for mgr in mgr.backends), ",")
+    print(io, "tune([$mgrs])")
+end
 
 tune(backends) = Tune(backends, Dict{Any, TunedCall}())
 
@@ -42,13 +46,17 @@ signature(t::Union{Tuple, NamedTuple}) = map(signature, t)
 
 # pick an index with probability proportional to scores
 function pick(scores::Vector{F}) where F
-    mscore = maximum(scores)
-    # if all scores are zero, pick a uniformly random index
-    mscore>0 || return rand(eachindex(scores))
-    # change zero scores (not yet sampled) to maximum score
-    scores = [score == 0 ? mscore : score for score in scores]
-    # now pick a backend with probability proportional to score
-    x, y, picked = zero(mscore), rand()*sum(scores), 1
+    if minimum(scores)>0
+        pick_from(scores)
+    else
+        # we have not sampled each manager once,
+        # => sample among not-yet-sampled managers
+        pick_from([score > 0 ? zero(F) : one(F) for score in scores])
+    end
+end
+
+function pick_from(scores::Vector{F}) where F
+    x, y, picked = zero(F), rand()*sum(scores), 1
     for i in eachindex(scores)
         x = x+scores[i]
         x>=y && break
@@ -58,9 +66,16 @@ function pick(scores::Vector{F}) where F
 end
 
 function sample(picked, scores, backend, fun::Fun, range, args) where Fun
+    compile_elapsedtimes = Base.cumulative_compile_time_ns()
+    Base.cumulative_compile_timing(true)
     start = time_ns()
     ManagedLoops.offload(fun, backend, range, args...)
     elapsed = (time_ns()-start)*1e-9
-    scores[picked] += elapsed^(-2)
+    Base.cumulative_compile_timing(false)
+    if Base.cumulative_compile_time_ns() == compile_elapsedtimes # no time spent compiling
+        scores[picked] += elapsed^(-0.2)
+    else
+#        @info "Compilation detected, discarding time sample"
+    end
     return nothing
 end
