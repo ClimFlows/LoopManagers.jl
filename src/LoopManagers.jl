@@ -60,7 +60,7 @@ Returns a manager that offloads computations to a `KernelAbstractions` GPU backe
 The returned manager will call `ArrayType(data)` when it needs
 to transfer `data` to the device.
 !!! note
-    While `KA_GPU` is always available, implementations of [`offload`](@ref)
+    While `KA_GPU` is always available, implementations of [`offload`]
     are available only if the module `KernelAbstractions` is loaded by the main program or its dependencies.
 """
 function KernelAbstractions_GPU end

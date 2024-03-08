@@ -43,7 +43,7 @@ marked with `@vec` will use explicit vectorization. If this causes errors, use `
 Vectorization of loops marked with `@simd` is left to the Julia/LLVM compiler, as with PlainCPU.
 
 !!! note
-    [`no_simd(::VectorizedCPU)`](@ref ManagedLoops.no_simd) returns a `PlainCPU`.
+    `ManagedLoops.no_simd(::VectorizedCPU)` returns a `PlainCPU`.
 """
 struct VectorizedCPU{VLen} <: SingleCPU end
 
