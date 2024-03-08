@@ -20,7 +20,7 @@ function test(mgr, b)
     a = similar(b)
     @info mgr
     loop!(mgr, exp, a, b)
-    display(@be loop!(mgr, exp, a, b))
+    display(@be loop!(mgr, exp, a, b) seconds=1)
     return nothing
 end
 
@@ -35,27 +35,18 @@ end
     @test true
 end
 
-managers = Any[
+@testset "SIMD, multithread and auto-tuned managers" begin
+    managers = Any[
     LoopManagers.PlainCPU(),
     LoopManagers.VectorizedCPU(),
     LoopManagers.MultiThread(),
-    LoopManagers.MultiThread(VectorizedCPU()),
-    LoopManagers.MainThread(VectorizedCPU()),
-]
-
-
-@testset "SIMD and fork-join managers" begin
+    LoopManagers.MultiThread(VectorizedCPU(4)),
+    LoopManagers.MultiThread(VectorizedCPU(8)),
+    LoopManagers.MultiThread(VectorizedCPU(16)),]
+    openMP=LoopManagers.MainThread(VectorizedCPU())
     let b = randn(1024, 1024)
-
-        tuner = LoopManagers.tune(managers)
-        let a = similar(b)
-            for _ in 1:100
-                loop!(tuner, exp, a, b)
-            end
-        end
-        @info first(tuner.calls).second
-
-        for mgr in vcat(managers, tuner)
+        auto = LoopManagers.tune(managers)
+        for mgr in vcat(managers, openMP, auto)
             test(mgr, b)
             @test true
         end

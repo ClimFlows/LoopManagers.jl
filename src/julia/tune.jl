@@ -1,10 +1,34 @@
 # const Managers = Vector{HostManager}
 
-struct TunedCall
-    scores::Vector{Float64}
-end
-TunedCall(n::Int) = TunedCall(zeros(n))
+# Log-normal distributions
 
+struct LogNormal
+    N::Int
+    mean::Float64
+    var::Float64
+end
+LogNormal()=LogNormal(0,0,0)
+
+function draw(law::LogNormal)
+    law.N<2 && return -Inf
+    return randn()*sqrt(law.var)+law.mean
+end
+
+function push(law::LogNormal, t)
+    (;N, var, mean) = law
+    logt = log10(t)
+    mean_new = (N*mean + logt)/(N+1)
+    var_new = (N*var + (logt-mean)*(logt-mean_new))/(N+1)
+    return LogNormal(N+1, mean_new, var_new)
+end
+
+# Statistics of calling a certain function signature
+struct TunedCall
+    stats::Vector{LogNormal}
+end
+TunedCall(n::Int) = TunedCall([LogNormal() for i=1:n])
+
+# Auto-tuning manager
 struct Tune <: ManagedLoops.HostManager
     backends::Vector{HostManager}
     calls::Dict{Any,TunedCall}
@@ -34,48 +58,29 @@ function ManagedLoops.offload(fun::Fun, b::Tune, range, args::Vararg{Any,N}) whe
         calls[sig] = TunedCall(length(backends))
     end
     call = calls[sig]
-    picked = pick(call.scores) # index into backends, call.scores
-    sample(picked, call.scores, backends[picked], fun, range, args)
+    stats = call.stats
+    picked = pick(stats)
+    stats[picked] = sample(stats[picked], backends[picked], fun, range, args)
     return nothing
 end
+
+pick(stats) = argmin(draw(law) for law in stats)
 
 # signature of function call
 signature(x) = typeof(x)
 signature(a::AbstractArray) = eltype(a), axes(a)
 signature(t::Union{Tuple, NamedTuple}) = map(signature, t)
 
-# pick an index with probability proportional to scores
-function pick(scores::Vector{F}) where F
-    if minimum(scores)>0
-        pick_from(scores)
-    else
-        # we have not sampled each manager once,
-        # => sample among not-yet-sampled managers
-        pick_from([score > 0 ? zero(F) : one(F) for score in scores])
-    end
-end
-
-function pick_from(scores::Vector{F}) where F
-    x, y, picked = zero(F), rand()*sum(scores), 1
-    for i in eachindex(scores)
-        x = x+scores[i]
-        x>=y && break
-        picked = i+1
-    end
-    return min(picked, length(scores))
-end
-
-function sample(picked, scores, backend, fun::Fun, range, args) where Fun
-    compile_elapsedtimes = Base.cumulative_compile_time_ns()
+function sample(law, backend, fun::Fun, range, args) where Fun
+    compile_time = Base.cumulative_compile_time_ns()
     Base.cumulative_compile_timing(true)
     start = time_ns()
     ManagedLoops.offload(fun, backend, range, args...)
     elapsed = (time_ns()-start)*1e-9
     Base.cumulative_compile_timing(false)
-    if Base.cumulative_compile_time_ns() == compile_elapsedtimes # no time spent compiling
-        scores[picked] += elapsed^(-0.2)
+    if Base.cumulative_compile_time_ns() == compile_time # no time spent compiling
+        return push(law, elapsed)
     else
-#        @info "Compilation detected, discarding time sample"
+        return law
     end
-    return nothing
 end
