@@ -1,0 +1,7 @@
+[deps]
+Chairmarks = "0ca39b1e-fe0b-4e98-acfc-b1656634c4de"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+ManagedLoops = "36a4119d-6b73-4371-88fe-ba2d91f5495d"
+SIMDMathFunctions = "d22a7203-ad50-4fbc-abc4-d6ac724cca58"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
