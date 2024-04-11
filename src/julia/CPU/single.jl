@@ -118,3 +118,11 @@ end
 @inline Base.iterate(range::VecBulk) = next_bulk(range, range.start)
 @inline Base.iterate(range::VecBulk{N}, prev) where N = next_bulk(range, prev+N)
 @inline next_bulk(range::VecBulk{N}, next) where N = (next < range.vstop) ? (SIMD.VecRange{N}(next), next) : nothing
+
+
+# support for @vec if ... else
+@inline function ManagedLoops.choose(m::SIMD.Vec{N,Bool}, iftrue, iffalse) where N
+    all(m) && return iftrue()
+    any(m) || return iffalse()
+    return SIMD.vifelse(m, iftrue(), iffalse())
+end
