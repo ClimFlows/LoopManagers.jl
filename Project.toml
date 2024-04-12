@@ -1,7 +1,7 @@
 name = "LoopManagers"
 uuid = "d33d4f76-8fbe-47a6-acd9-ead534c583ff"
 authors = ["The ClimFlows contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 HostCPUFeatures = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
@@ -17,7 +17,7 @@ KA_Ext = "KernelAbstractions"
 
 [compat]
 HostCPUFeatures = "0.1"
-ManagedLoops = "0.1"
+ManagedLoops = "0.1.2"
 Polyester = "0.7"
 SIMD = "3.4"
 julia = "1.8"
