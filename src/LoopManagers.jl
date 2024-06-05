@@ -23,10 +23,12 @@ const VArgs{N}=Vararg{Any,N}
 const Range1 = AbstractUnitRange
 const Range2{I,J} = Tuple{I,J}
 const Range3{I,J,K} = Tuple{I,J,K}
+const Range4{I,J,K,L} = Tuple{I,J,K,L}
 
 @inline call_single_index(i, fun, args) = fun((i,), args...)
 @inline call_single_index((i,j)::Range2, fun, args) = fun(((i,),(j,)), args...)
 @inline call_single_index((i,j,k)::Range3, fun, args) = fun(((i,),(j,),(k,)), args...)
+@inline call_single_index((i,j,k,l)::Range4, fun, args) = fun(((i,),(j,),(k,),(l,)), args...)
 
 import HostCPUFeatures # for single.jl
 import SIMD # for single.jl

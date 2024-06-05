@@ -10,7 +10,7 @@ abstract type SingleCPU<:HostManager end
 end
 
 @inline function offload_single(fun::Fun, b::SingleCPU, range, args, NT, id) where {Fun<:Function}
-#    check_boxed_variables(fun)
+    check_boxed_variables(fun)
     drange = distribute(range, b, NT, id)
     @inline fun(drange, args...)
 end
@@ -34,6 +34,7 @@ end
 # distribute outer (last) range over threads
 @inline distribute_plain((ri,rj)::Range2, NT, id) = (ri, distribute_plain(rj,NT,id))
 @inline distribute_plain((ri,rj,rk)::Range3, NT, id) = (ri, rj, distribute_plain(rk,NT,id))
+@inline distribute_plain((ri,rj,rk,rl)::Range4, NT, id) = (ri, rj, rk, distribute_plain(rl,NT,id))
 
 """
     manager = VectorizedCPU()
@@ -78,6 +79,7 @@ end
 # distribute outer (last) range over threads, vectorize inner (first) range
 @inline distribute_simd((ri,rj)::Range2, b, NT, id) = (distribute_simd(ri,b,1,1), distribute_plain(rj,NT,id))
 @inline distribute_simd((ri,rj,rk)::Range3, b, NT, id) = (distribute_simd(ri,b,1,1), rj, distribute_plain(rk,NT,id))
+@inline distribute_simd((ri,rj,rk,rl)::Range4, b, NT, id) = (distribute_simd(ri,b,1,1), rj, rk, distribute_plain(rl,NT,id))
 
 #======================= Vectorized range ====================#
 
@@ -126,3 +128,11 @@ end
     any(m) || return iffalse()
     return SIMD.vifelse(m, iftrue(), iffalse())
 end
+
+# support for managed broadcasting with SIMD
+# FIXME: Base.@propagate_inbounds would be safer than @inbounds
+Base.getindex(bc::Broadcast.Broadcasted, i::SIMD.VecRange, j...) = call(bc.f, i, j, bc.args...)
+call(f, i, j ,a) = @inbounds f(a[i,j...])
+call(f, i, j, a, b) = @inbounds f(a[i,j...], b[i,j...])
+call(f, i, j, a, b, c) = @inbounds f(a[i,j...], b[i,j...], c[i,j...])
+call(f, i, j, a, b, c, d) = @inbounds f(a[i,j...], b[i,j...], c[i,j...], d[i,j...])

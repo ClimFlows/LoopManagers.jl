@@ -55,3 +55,21 @@ end
         end
     end
 end
+
+test_bc(mgr, a,b,c) = @. mgr[a] = log(exp(b)*exp(c))
+
+@testset "Managed broadcasting" begin
+    managers = Any[
+    LoopManagers.PlainCPU(),
+    LoopManagers.VectorizedCPU(),
+    LoopManagers.MultiThread(),
+    LoopManagers.MultiThread(VectorizedCPU())]
+
+    for dims in (10000, (100,100), (100, 10, 10), (10,10,10,10))
+        a, b, c = (randn(Float32, dims) for i=1:3)
+        for mgr in managers
+            test_bc(mgr, a, b, c)
+            @test true
+        end
+    end
+end
