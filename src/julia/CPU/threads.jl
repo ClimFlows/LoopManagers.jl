@@ -23,16 +23,12 @@ struct Args{T}
     args::T
 end
 
-function offload(
-    fun::Fun,
-    manager::MultiThread,
-    range,
-    args::VArgs{NA},
-) where {Fun<:Function,NA}
+function offload(fun::Fun, manager::MultiThread, range, args::VArgs{NA}) where {Fun<:Function,NA}
     check_boxed_variables(fun)
     args = Args(args)
-    Polyester.@batch for id = 1:manager.nthreads
-        offload_single(fun, manager.b, range, args.args, manager.nthreads, id)
+#    Polyester.@batch for id = 1:manager.nthreads
+    Threads.@threads for id = 1:manager.nthreads
+       offload_single(fun, manager.b, range, args.args, manager.nthreads, id)
     end
 end
 

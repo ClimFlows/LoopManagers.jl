@@ -131,8 +131,24 @@ end
 
 # support for managed broadcasting with SIMD
 # FIXME: Base.@propagate_inbounds would be safer than @inbounds
-Base.getindex(bc::Broadcast.Broadcasted, i::SIMD.VecRange, j...) = call(bc.f, i, j, bc.args...)
-call(f, i, j ,a) = @inbounds f(a[i,j...])
-call(f, i, j, a, b) = @inbounds f(a[i,j...], b[i,j...])
-call(f, i, j, a, b, c) = @inbounds f(a[i,j...], b[i,j...], c[i,j...])
-call(f, i, j, a, b, c, d) = @inbounds f(a[i,j...], b[i,j...], c[i,j...], d[i,j...])
+@inline function Base.getindex(bc::Broadcast.Broadcasted, i::SIMD.VecRange, J::Vararg{Union{Int, CartesianIndex},N}) where N
+    broadcast_getindex_vec(bc, i, CartesianIndex(J))
+end
+
+@inline function broadcast_getindex_vec(bc::Broadcast.Broadcasted{<:Any,<:Any,<:Any,<:Any}, i, J)
+    args = getargs(bc.args, i, J)
+    return bc.f(args...)
+end
+
+# recursively constructs (args[1][i,J], args[2][i,J], ...)
+@inline getargs(args::Tuple, i, J) = ( getarg(args[1], i, J), getargs(Base.tail(args), i, J)...)
+@inline getargs(args::Tuple{Any}, i, J) = ( getarg(args[1], i, J), )
+@inline getargs(::Tuple{}, i, J) = ()
+
+# get a single argument at index [i,J]
+@inline getarg(A::Union{Ref,AbstractArray{<:Any,0},Number}, _, _) = A[] # Scalar-likes can just ignore all indices
+@inline getarg(A, i, J) = @inbounds A[i, CartesianIndex(new_index(A, J))]
+@inline getarg(A::AbstractArray, i, J) = @inbounds A[i, new_index(A, J)...]
+
+# truncate indices beyond rank
+@inline new_index(A, J::CartesianIndex) = J.I[1:(ndims(A)-1)]
