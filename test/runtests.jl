@@ -44,12 +44,11 @@ function timed(fun, N)
     return Float32(sum(times[1:N])/N)
 end
 
-function scaling(fun, name, N)
+function scaling(fun, name, N, simd=VectorizedCPU())
     @info "====== Multi-thread scaling: $name ======"
     single = 1e9
     @info "Threads \t elapsed \t speedup \t efficiency"
     for nt = 1:Threads.nthreads()
-        simd = LoopManagers.VectorizedCPU()
         mgr = LoopManagers.MultiThread(simd, nt)
         elapsed = timed(() -> fun(mgr), N)
         nt == 1 && (single = elapsed)
@@ -73,6 +72,11 @@ let b = randn(128, 64, 30), a = similar(b)
     end
     scaling("reverse cumsum 2", 100) do mgr
         my_cumsum2!(mgr, a, b, 1.0, 1.234)
+    end
+    for vlen in (8,16,32)
+        scaling("reverse cumsum 3 vlen=$vlen", 100, VectorizedCPU(vlen)) do mgr
+            my_cumsum3!(mgr, a, b, 1.0, 1.234)
+        end
     end
 end
 
