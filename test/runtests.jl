@@ -3,9 +3,9 @@ using ManagedLoops: @loops, @vec
 using SIMDMathFunctions
 using KernelAbstractions
 
-#using ThreadPinning
-#pinthreads(:cores)
-#threadinfo()
+using ThreadPinning
+pinthreads(:cores)
+threadinfo()
 
 using InteractiveUtils: versioninfo, @code_native
 using Chairmarks: @be
@@ -16,9 +16,9 @@ include("cumsum.jl")
 versioninfo()
 
 myfun(x) = @vec if x > 0
-    log(x)
+    exp(log(x))
 else
-    exp(x)
+    log(exp(x))
 end
 
 @loops function loop!(_, fun, a, b)
@@ -67,16 +67,13 @@ end
 println()
 
 let b = randn(128, 64, 30), a = similar(b)
-    scaling("reverse cumsum", 100) do mgr
-        my_cumsum!(mgr, a, b, 1.0, 1.234)
-    end
-    scaling("reverse cumsum 2", 100) do mgr
-        my_cumsum2!(mgr, a, b, 1.0, 1.234)
-    end
-    for vlen in (8,16,32)
-        scaling("reverse cumsum 3 vlen=$vlen", 100, VectorizedCPU(vlen)) do mgr
-            my_cumsum3!(mgr, a, b, 1.0, 1.234)
+    for vlen in (4,16,64)
+        scaling_cumsum(msg, fun!) = scaling("$msg vlen=$vlen", 1000, VectorizedCPU(vlen)) do mgr
+            fun!(mgr, a, b, 1.0, 1.234)
         end
+        scaling_cumsum("reverse cumsum_1", my_cumsum!)
+        scaling_cumsum("reverse cumsum_2", my_cumsum2!)
+        scaling_cumsum("reverse cumsum_3", my_cumsum3!)
     end
 end
 
