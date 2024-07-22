@@ -16,9 +16,9 @@ include("cumsum.jl")
 versioninfo()
 
 myfun(x) = @vec if x > 0
-    log(x)
+    exp(log(x))
 else
-    exp(x)
+    log(exp(x))
 end
 
 @loops function loop!(_, fun, a, b)
@@ -67,8 +67,8 @@ end
 println()
 
 let b = randn(128, 64, 30), a = similar(b)
-    for vlen in (4,8,16)
-        scaling_cumsum(msg, fun!) = scaling("$msg vlen=$vlen", 100, VectorizedCPU(vlen)) do mgr
+    for vlen in (4,16,64)
+        scaling_cumsum(msg, fun!) = scaling("$msg vlen=$vlen", 1000, VectorizedCPU(vlen)) do mgr
             fun!(mgr, a, b, 1.0, 1.234)
         end
         scaling_cumsum("reverse cumsum_1", my_cumsum!)
