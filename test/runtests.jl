@@ -3,9 +3,9 @@ using ManagedLoops: @loops, @vec
 using SIMDMathFunctions
 using KernelAbstractions
 
-#using ThreadPinning
-#pinthreads(:cores)
-#threadinfo()
+using ThreadPinning
+pinthreads(:cores)
+threadinfo()
 
 using InteractiveUtils: versioninfo, @code_native
 using Chairmarks: @be
