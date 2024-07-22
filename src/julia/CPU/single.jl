@@ -47,6 +47,7 @@ Vectorization of loops marked with `@simd` is left to the Julia/LLVM compiler, a
     `ManagedLoops.no_simd(::VectorizedCPU)` returns a `PlainCPU`.
 """
 struct VectorizedCPU{VLen} <: SingleCPU end
+no_simd(::VectorizedCPU) = PlainCPU()
 
 const N32 = Int64(HostCPUFeatures.pick_vector_width(Float32))
 

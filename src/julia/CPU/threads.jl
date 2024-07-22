@@ -12,22 +12,23 @@ so that `barrier` is not needed between two uses of `offload` and does nothing.
     See also [Julia Discourse](https://discourse.julialang.org/t/compact-vs-scattered-pinning/69722)
 """
 struct MultiThread{Manager<:SingleCPU} <: HostManager
-    b::Manager
+    single::Manager
     nthreads::Int
-    MultiThread(b::B = PlainCPU(), nt = Threads.nthreads()) where {B} = new{B}(b, nt)
+    MultiThread(mgr::M = PlainCPU(), nt = Threads.nthreads()) where M = new{M}(mgr, nt)
 end
-Base.show(io::IO, mgr::MultiThread) = print(io, "MultiThread($(mgr.b), $(mgr.nthreads))")
+Base.show(io::IO, mgr::MultiThread) = print(io, "MultiThread($(mgr.single), $(mgr.nthreads))")
+no_simd(mgr::MultiThread) = MultiThread(no_simd(mgr.single), mgr.nthreads)
 
 # Wraps arguments in order to avoid conversion to PtrArray by Polyester
 struct Args{T}
     args::T
 end
 
-function offload(fun::Fun, manager::MultiThread, range, args::VArgs{NA}) where {Fun<:Function,NA}
+function offload(fun::Fun, mgr::MultiThread, range, args::VArgs{NA}) where {Fun<:Function,NA}
     check_boxed_variables(fun)
     args = Args(args)
-    Polyester.@batch for id = 1:manager.nthreads
-       offload_single(fun, manager.b, range, args.args, manager.nthreads, id)
+    Polyester.@batch for id = 1:mgr.nthreads
+       offload_single(fun, mgr.single, range, args.args, mgr.nthreads, id)
     end
 end
 

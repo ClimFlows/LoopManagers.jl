@@ -9,7 +9,7 @@ new manager types and implementing specialized versions of `ManagedLoops.offload
 module LoopManagers
 
 using ManagedLoops
-import ManagedLoops: offload, parallel, barrier, master, share
+import ManagedLoops: offload, no_simd, parallel, barrier, master, share
 
 export PlainCPU, MultiThreadCPU, VectorizedCPU, MultiThreadSIMD
 export CUDA_GPU, oneAPI_GPU
