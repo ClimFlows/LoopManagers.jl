@@ -83,7 +83,9 @@ end
     @info "Testing MainThread with $(main.nthreads) threads."
     LoopManagers.parallel(main) do worker
         @info "Worker $(worker.id)"
-        x = LoopManagers.share(randn, worker)
+        x = LoopManagers.share(worker) do master
+            randn()
+        end
         println("Thread $(Threads.threadid()) has drawn $x.")
     end
     @test true

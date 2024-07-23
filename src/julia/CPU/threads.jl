@@ -40,11 +40,11 @@ mutable struct ConditionBarrier
 end
 
 """
-    manager = MainThread(cpu_manager=PlainCPU())
+    manager = MainThread(cpu_manager=PlainCPU(), nthreads=Threads.nthreads())
 
 Returns a multithread manager derived from `cpu_manager`, initially in sequential mode.
 In this mode, `manager` behaves exactly like `cpu_manager`.
-When `manager` is passed to `ManagedLoops.parallel`, `Threads.nthreads()` threads are spawn.
+When `manager` is passed to `ManagedLoops.parallel`, `nthreads` threads are spawn.
 The `manager` passed to threads works in parallel mode.
 In this mode, `manager` behaves like `cpu_manager`,
 except that the outer loop is distributed among threads.
@@ -54,7 +54,7 @@ allow synchronisation and data-sharing across threads.
 ```julia
 main_mgr = MainThread()
 LoopManagers.parallel(main_mgr) do thread_mgr
-    x = LoopManagers.share(thread_mgr) do master
+    x = LoopManagers.share(thread_mgr) do master_mgr
         randn()
     end
     println("Thread \$(Threads.threadid()) has drawn \$x.")
@@ -141,7 +141,7 @@ function share(fun, worker::WorkThread, args::Vararg{Any,N}) where {N}
     barrier(worker)
     id = worker.id
     # only master thread is allowed to write to barrier.shared
-    id == 1 && (b.shared = fun(args...))
+    id == 1 && (b.shared = fun(worker.manager, args...))
     # barrier ensures that other threads read *after* the master has written
     barrier(worker)
     shared = b.shared # ::Any => type instability
