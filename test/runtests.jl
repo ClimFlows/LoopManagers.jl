@@ -39,12 +39,12 @@ end
 
 function timed(fun, N)
     fun()
-    times = [(@timed fun()).time for _ in 1:N+10]
+    times = [(@timed fun()).time for _ = 1:N+10]
     sort!(times)
-    return Float32(sum(times[1:N])/N)
+    return Float32(sum(times[1:N]) / N)
 end
 
-function scaling(fun, name, N, simd=VectorizedCPU())
+function scaling(fun, name, N, simd = VectorizedCPU())
     @info "====== Multi-thread scaling: $name ======"
     single = 1e9
     @info "Threads \t elapsed \t speedup \t efficiency"
@@ -52,8 +52,8 @@ function scaling(fun, name, N, simd=VectorizedCPU())
         mgr = LoopManagers.MultiThread(simd, nt)
         elapsed = timed(() -> fun(mgr), N)
         nt == 1 && (single = elapsed)
-        percent(x) = round(100x; digits=0)
-        speedup = single/elapsed
+        percent(x) = round(100x; digits = 0)
+        speedup = single / elapsed
         @info "$nt \t\t $elapsed \t $(percent(speedup))% \t $(percent(speedup/nt))%"
     end
     println()
@@ -67,27 +67,26 @@ end
 println()
 
 let b = randn(128, 64, 30), a = similar(b)
-    for vlen in (4,16,64)
-        scaling_cumsum(msg, fun!) = scaling("$msg vlen=$vlen", 1000, VectorizedCPU(vlen)) do mgr
-            fun!(mgr, a, b, 1.0, 1.234)
-        end
+    for vlen in (4, 16, 64)
+        scaling_cumsum(msg, fun!) =
+            scaling("$msg vlen=$vlen", 1000, VectorizedCPU(vlen)) do mgr
+                fun!(mgr, a, b, 1.0, 1.234)
+            end
         scaling_cumsum("reverse cumsum_1", my_cumsum!)
         scaling_cumsum("reverse cumsum_2", my_cumsum2!)
         scaling_cumsum("reverse cumsum_3", my_cumsum3!)
     end
 end
 
-if Threads.nthreads()<10 # there is a bug that triggers with many threads
-    @testset "OpenMP-like manager" begin
-        main = LoopManagers.MainThread()
-        LoopManagers.parallel(main) do worker
-            x = LoopManagers.share(worker) do
-                randn()
-            end
-            println("Thread $(Threads.threadid()) has drawn $x.")
-        end
-        @test true
+@testset "OpenMP-like manager" begin
+    main = LoopManagers.MainThread(PlainCPU(), 10)
+    @info "Testing MainThread with $(main.nthreads) threads."
+    LoopManagers.parallel(main) do worker
+        @info "Worker $(worker.id)"
+        x = LoopManagers.share(randn, worker)
+        println("Thread $(Threads.threadid()) has drawn $x.")
     end
+    @test true
 end
 
 println()
