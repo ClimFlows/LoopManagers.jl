@@ -40,11 +40,11 @@ mutable struct ConditionBarrier
 end
 
 """
-    manager = MainThread(cpu_manager=PlainCPU())
+    manager = MainThread(cpu_manager=PlainCPU(), nthreads=Threads.nthreads())
 
 Returns a multithread manager derived from `cpu_manager`, initially in sequential mode.
 In this mode, `manager` behaves exactly like `cpu_manager`.
-When `manager` is passed to `ManagedLoops.parallel`, `Threads.nthreads()` threads are spawn.
+When `manager` is passed to `ManagedLoops.parallel`, `nthreads` threads are spawn.
 The `manager` passed to threads works in parallel mode.
 In this mode, `manager` behaves like `cpu_manager`,
 except that the outer loop is distributed among threads.
@@ -54,7 +54,7 @@ allow synchronisation and data-sharing across threads.
 ```julia
 main_mgr = MainThread()
 LoopManagers.parallel(main_mgr) do thread_mgr
-    x = LoopManagers.share(thread_mgr) do master
+    x = LoopManagers.share(thread_mgr) do master_mgr
         randn()
     end
     println("Thread \$(Threads.threadid()) has drawn \$x.")
@@ -64,8 +64,9 @@ end
 struct MainThread{Manager} <: HostManager
     cbarrier::ConditionBarrier
     manager::Manager
+    nthreads::Int
 end
-MainThread(manager = PlainCPU()) = MainThread(ConditionBarrier(), manager)
+MainThread(manager = PlainCPU(), nt=Threads.nthreads()) = MainThread(ConditionBarrier(), manager, nt)
 Base.show(io::IO, main::MainThread) = print(io, "MainThread($(main.manager))")
 
 @inline function no_simd(main::MainThread)
@@ -117,18 +118,12 @@ parallel(::Any, worker::WorkThread) =
 
 function parallel(action::Fun, main::MainThread, args::Vararg{Any,N}) where {Fun,N}
     main.cbarrier.arrived = (0, 0, :open) # reset barrier
-    Threads.@threads for id = 1:Threads.nthreads()
-        worker = WorkThread(main.cbarrier, main.manager, Threads.nthreads(), id)
-        action(worker, args...)
+    @sync for id=1:main.nthreads
+        worker = WorkThread(main.cbarrier, main.manager, main.nthreads, id)
+        Threads.@spawn action(worker, args...)
     end
     return nothing
 end
-
-function barrier(worker::WorkThread, there::Symbol = :unknown)
-    (; cbarrier, N, id) = worker
-    wait_condition_barrier(cbarrier, N, id, there)
-end
-
 
 function master(fun::Fun, worker::WorkThread, args::Vararg{Any,N}) where {Fun,N}
     barrier(worker)
@@ -146,7 +141,7 @@ function share(fun, worker::WorkThread, args::Vararg{Any,N}) where {N}
     barrier(worker)
     id = worker.id
     # only master thread is allowed to write to barrier.shared
-    id == 1 && (b.shared = fun(args...))
+    id == 1 && (b.shared = fun(worker.manager, args...))
     # barrier ensures that other threads read *after* the master has written
     barrier(worker)
     shared = b.shared # ::Any => type instability
@@ -157,14 +152,19 @@ function share(fun, worker::WorkThread, args::Vararg{Any,N}) where {N}
     return shared
 end
 
-function wait_condition_barrier(cb::ConditionBarrier, size, id, there)
-    (; barrier, arrived) = cb
-    #    @info "Enter condition_barrier" there id size
+function barrier(worker::WorkThread, there::Symbol = :unknown)
+    (; cbarrier, N, id) = worker
+    wait_condition_barrier(cbarrier, N, id, there)
+end
 
-    lock(barrier)
+function wait_condition_barrier(cb::ConditionBarrier, size, id, there)
+#    @info "Enter condition_barrier" there id size
+    lock(cb.barrier)
     try
+        (; barrier, arrived) = cb
         (arrived_old, id_old, there_old) = arrived
         arrived_new = arrived_old + 1
+
         if (arrived_new > 1) && (there_old != there)
             err = """
             Race condition detected. Worker $id is waiting at :
@@ -174,16 +174,19 @@ function wait_condition_barrier(cb::ConditionBarrier, size, id, there)
             """
             error(err)
         end
-        if arrived_new == size
-            cb.arrived = (0, 0, :open)
-            notify(barrier)
+
+        if arrived_new == size # we are the last thread arriving at the barrier
+            cb.arrived = (0, 0, :open) # reset barrier for future use
+#            @info "We are the last thread" id cb.arrived
+            notify(barrier) # release other threads waiting at barrier
         else
             cb.arrived = (arrived_new, id, there)
+#            @info "waiting for more threads to arrive at barrier" id cb.arrived
             wait(barrier)
         end
     finally
-        unlock(barrier)
+        unlock(cb.barrier)
     end
-    #    @info "Leave condition_barrier" there id
+#    @info "Leave condition_barrier" there id
     return nothing
 end
