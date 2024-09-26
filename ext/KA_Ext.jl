@@ -21,12 +21,13 @@ synchronize(mgr::KA_GPU) = KA_sync(mgr.gpu)
     return nothing
 end
 
-@inline function offload(fun, backend::KA_GPU, (irange, jrange)::Range2, args...)
+@inline function offload(fun::Fun, backend::KA_GPU, (irange, jrange)::Range2, args...) where Fun
     (; gpu) = backend
     M, N = length(irange), length(jrange)
     i0, j0 = first(irange)-1, first(jrange)-1
-    kernel = kernel_KA_2D(gpu, (32,32), (32,N))
-    kernel(fun, i0, j0, last(irange), args)
+#    kernel = kernel_KA_2D(gpu, (32,32), (32,N))
+    kernel = kernel_KA_2D(gpu)
+    kernel(fun, i0, j0, last(irange), args; ndrange=map(length, (irange,jrange)))
     return nothing
 end
 
@@ -35,10 +36,11 @@ end
     @inline fun((i+i0,), args...)
 end
 
-@kernel function kernel_KA_2D(fun, i0, j0, M, args)
+@kernel function kernel_KA_2D(fun::Fun, i0, j0, M, args) where Fun
     i, j = @index(Global, NTuple)
-    ranges = (i+i0):32:M, (j+j0,)
-    @inline fun(ranges, args...)
+#    ranges = (i+i0):32:M, (j+j0,)
+    ranges = (i+i0,), (j+j0,)
+@inline fun(ranges, args...)
 end
 
 end
