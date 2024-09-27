@@ -67,4 +67,9 @@ to transfer `data` to the device.
 """
 function KernelAbstractions_GPU end
 
+using PackageExtensionCompat
+function __init__()
+    @require_extensions
+end
+
 end # module LoopManagers
