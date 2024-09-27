@@ -17,7 +17,7 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 KA_Ext = "KernelAbstractions"
 
 [compat]
-HostCPUFeatures = "0.1"
+HostCPUFeatures = "0.1.8"
 KernelAbstractions = "0.9"
 ManagedLoops = "0.1.10"
 PackageExtensionCompat = "1"
