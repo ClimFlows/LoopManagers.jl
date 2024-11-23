@@ -7,13 +7,12 @@ import KernelAbstractions.Adapt.adapt_storage
 using LoopManagers: LoopManagers, Range1, Range2
 import ManagedLoops: synchronize, offload, DeviceManager
 
-struct KA_GPU{Blocks,G,A} <: DeviceManager
+struct KA_GPU{Blocks,G} <: DeviceManager
     gpu::G
-    adaptor::A # adaptor to device-side arrays
     blocks::Val{Blocks}
 end
-LoopManagers.KernelAbstractions_GPU(gpu, adaptor, blocks::Tuple{Int,Int} = (0, 0)) =
-    KA_GPU(gpu, adaptor, Val(blocks))
+LoopManagers.KernelAbstractions_GPU(gpu, blocks::Tuple{Int,Int} = (0, 0)) =
+    KA_GPU(gpu, Val(blocks))
 
 adapt_storage(mgr::KA_GPU, x) = adapt_mgr(mgr, x)
 adapt_mgr(_, x) = x
