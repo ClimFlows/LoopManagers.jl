@@ -1,7 +1,7 @@
 name = "LoopManagers"
 uuid = "d33d4f76-8fbe-47a6-acd9-ead534c583ff"
 authors = ["The ClimFlows contributors"]
-version = "0.1.6"
+version = "0.2.0"
 
 [deps]
 HostCPUFeatures = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
