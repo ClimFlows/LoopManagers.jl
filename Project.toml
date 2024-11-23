@@ -4,6 +4,7 @@ authors = ["The ClimFlows contributors"]
 version = "0.1.6"
 
 [deps]
+Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
 HostCPUFeatures = "3e5b6fbb-0976-4d2c-9146-d79de83f2fb0"
 ManagedLoops = "36a4119d-6b73-4371-88fe-ba2d91f5495d"
 PackageExtensionCompat = "65ce6f38-6b18-4e1d-a461-8949797d7930"

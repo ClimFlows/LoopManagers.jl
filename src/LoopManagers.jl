@@ -67,6 +67,9 @@ to transfer `data` to the device.
 """
 function KernelAbstractions_GPU end
 
+# CPU flops counter
+include("julia/Flops/flops.jl")
+
 using PackageExtensionCompat
 function __init__()
     @require_extensions
