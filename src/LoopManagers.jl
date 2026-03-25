@@ -67,6 +67,57 @@ to transfer `data` to the device.
 """
 function KernelAbstractions_GPU end
 
+"""
+    config = GPUConfig(nwarp, repeat)
+Return singleton object `config` influencing how loops are executed on a GPU. Pass `config` to `configure`, and use the resulting manager with `@with` or `offload`. 
+- `nwarp` is the number of warps per block ; typical values are 1,2,4,8 ; higher values are beneficial for small kernels, but not for those using many registers
+- `repeat` is the number of elements taken care of by each thread ; higher value can help amortize the cost of launching the kernel.
+- an excessive value of `nwarp`*`repeat` may result in too few warp blocks to fill the GPU.
+
+For 1D loops: 
+- the loop is split into chunks of size `warpsize`*`nwarp`*`repeat` with `warpsize` a GPU-dependent number of threads per warp (usually 32)
+- each thread takes care of `repeat` indices separated by `warpsize`*`nwarp`, resulting in
+  contiguous memory accesses.
+- the number of warp blocks is roughly the loop count divided by `warpsize`*`nwarp`*`repeat`. 
+
+For 2D loops:
+- the inner loop is distributed among a single warp, so that data depending only on the outer loop index can be reused.
+- the outer loop is distributed among warp blocks.
+- each thread takes care of `repeat` outer indices separated by `nwarp`
+- the number of warp blocks is roughly the outer loop count divided by `nwarp`*`repeat`. 
+"""
+struct GPUConfig{NWarp, Repeat} 
+    GPUConfig(a,b) = new{Int(a), Int(b)}()
+end
+
+"""
+    nthreads = warpsize(gpu)
+Returns the number of threads per warp for a KernelAbstraction `gpu`. Defaults to 32.
+"""
+warpsize(::Any) = 32
+
+"""
+  range = SRange(start, step, stop)
+
+Return a range similar to `start:step:stop` with the following differences:
+- `step` is in the type domain and must be known at compile time
+- `start`, `step` and `stop` are converted to `UInt32`
+"""
+struct SRange{step}
+    start::UInt32
+    stop::UInt32
+    @inline SRange(start, step, stop) = new{I32(step)}(I32(start), I32(stop))
+    @inline function SRange{step}(start::UInt32, stop::UInt32) where step
+        step::UInt32
+        new{step}(start, stop)
+    end
+end
+I32(x) = unsafe_trunc(UInt32, x)
+
+@inline Base.iterate(range::SRange) = next_warp_index(range, range.start)
+@inline Base.iterate(range::SRange{step}, prev) where step = next_warp_index(range, I32(prev+step))
+@inline next_warp_index(range::SRange{step}, next) where step = (next <= range.stop) ? (next, next) : nothing
+
 using PackageExtensionCompat
 function __init__()
     @require_extensions
