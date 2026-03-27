@@ -19,7 +19,7 @@ KA_Ext = "KernelAbstractions"
 [compat]
 HostCPUFeatures = "0.1.8"
 KernelAbstractions = "0.9"
-ManagedLoops = "0.1.14"
+ManagedLoops = "0.1.15"
 PackageExtensionCompat = "1"
 Polyester = "0.7"
 SIMD = "3.4"
