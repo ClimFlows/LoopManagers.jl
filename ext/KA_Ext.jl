@@ -4,10 +4,11 @@ using KernelAbstractions: @kernel, @index, synchronize as KA_sync
 using KernelAbstractions.Adapt: adapt, adapt_structure
 import KernelAbstractions.Adapt.adapt_storage
 
-using LoopManagers: LoopManagers, Range1, Range2, GPUConfig, warpsize, SRange, I32
-import ManagedLoops: synchronize, offload, DeviceManager
+using LoopManagers: LoopManagers, Range1, Range2, 
+                    KernelAbstractions_GPU, GPUConfig, warpsize, SRange, I32
+import ManagedLoops: synchronize, offload
 
-struct KA_GPU{W, B, R, GPU} <: DeviceManager
+struct KA_GPU{W, B, R, GPU} <: KernelAbstractions_GPU{GPU}
     gpu::GPU
 end
 KA_GPU{W,B,R}(gpu) where {W,B,R} = KA_GPU{W,B,R,typeof(gpu)}(gpu)
@@ -28,27 +29,39 @@ offload(fun, mgr::KA_GPU, ijrange::Range2, args...) = offload_2D(fun, mgr, ijran
 #======================= one-dimensional iteration ====================#
 
 function offload_1D(fun::Fun, mgr::KA_GPU{<:Any, 0, 0}, irange, args) where {Fun}
-    kernel = kernel_KA_1D(mgr.gpu)
+    kernel = KA_1D(mgr.gpu)
     kernel(fun, I32(first(irange) - 1), args; ndrange = length(irange))
     return nothing
 end
 
-@kernel function kernel_KA_1D(fun, i0, args)
+@kernel function KA_1D(fun, i0, args)
     i = I32(@index(Global, Linear))
     i::UInt32
     @inline fun((i + i0,), args...)
 end
 
-function offload_1D(fun::Fun, mgr::KA_GPU{warpsize, nwarp, repeat}, irange, args) where {Fun, warpsize, nwarp, repeat}
-    kernel = kernel_KA_1D_blocked(mgr.gpu, block, length(irange))
-    kernel(fun, first(irange) - 1, Val{block}(), last(irange), args)
+function offload_1D(fun::Fun, mgr::KA_GPU{W, B, R}, irange, args) where {Fun, W, B, R}
+    block, chunk = W*B, W*B*R
+    n = div(length(irange)+(chunk-1), chunk) # split irange into n chunks of size B*R
+    kernel = KA_1D_WBR(mgr.gpu, block, (block,n))
+    i0, ilast = first(irange), last(irange)
+    kernel(fun, Val{(W,B,R)}(), I32(i0), I32(ilast), args)
     return nothing
 end
 
-@kernel function kernel_KA_1D_blocked(fun, i0, ::Val{block}, ilast, args) where {block}
-    i = @index(Global, Linear)
-    range = SRange(i+i0, block, ilast)
-    @inline fun(range, args...)
+@kernel function KA_1D_WBR(fun, ::Val{WBR}, i0, ilast, args) where WBR
+    (W, B, R) = WBR
+    chunk = B*R*W
+    # i0, ilast are 1-based
+    # j indexes chunks of B*R*W indices
+    i, j = @index(Global, NTuple)
+    i, j = zero_based(i), zero_based(j)
+    # each thread takes care of R indices : istart, istart+W*B, ..., istart+(R-1)*W*B
+    istart = muladd32(j, Val(chunk), i+i0) # 1-based
+    ilast = min(istart+I32((R-1)*W*B), ilast)
+    istart::UInt32
+    ilast::UInt32
+    @inline fun(SRange(istart, W*B, ilast), args...)
 end
 
 #==================== two-dimensional iteration ====================#
@@ -56,12 +69,12 @@ end
 function offload_2D(fun::Fun, mgr::KA_GPU{<:Any,0,0}, (irange, jrange), args) where {Fun}
     M, N = length(irange), length(jrange)
     i0, j0 = first(irange) - 1, first(jrange) - 1
-    kernel = kernel_KA_2D(mgr.gpu)
+    kernel = KA_2D(mgr.gpu)
     kernel(fun, I32(i0), I32(j0), args; ndrange = (M, N))
     return nothing
 end
 
-@kernel function kernel_KA_2D(fun::Fun, i0, j0, args) where {Fun}
+@kernel function KA_2D(fun::Fun, i0, j0, args) where {Fun}
     i, j = @index(Global, NTuple)
     ranges = (I32(i) + i0,), (I32(j) + j0,)
     @inline fun(ranges, args...)
@@ -70,13 +83,13 @@ end
 function offload_2D(fun::Fun, mgr::KA_GPU{W,B,R}, (irange, jrange), args) where {Fun,W,B,R}
     block, chunk = W*B, B*R
     n = div(length(jrange)+(chunk-1), chunk) # split jrange into n chunks of size B*R
-    kernel = kernel_2D_WBR(mgr.gpu, block, (block,n))
+    kernel = KA_2D_WBR(mgr.gpu, block, (block,n))
     i0, j0 = first(irange), first(jrange)
     kernel(fun, Val{(W,B,R)}(), I32(i0), I32(last(irange)), I32(j0), I32(last(jrange)), args; ndrange = (block, n))
     return nothing
 end
 
-@kernel function kernel_2D_WBR(fun, ::Val{WBR}, i0::UInt32, ilast::UInt32, j0::UInt32, jlast::UInt32, args) where WBR
+@kernel function KA_2D_WBR(fun, ::Val{WBR}, i0::UInt32, ilast::UInt32, j0::UInt32, jlast::UInt32, args) where WBR
     (W, B, R) = WBR
     chunk = B*R
     # i0, j0, ilast, jlast are 1-based
@@ -101,7 +114,7 @@ end
         jstart::UInt32
         istart::UInt32
         irange = SRange(istart, W, ilast)
-        jlast = min(jstart+(R-1)*B, jlast)
+        jlast = min(jstart+I32((R-1)*B), jlast)
         while jstart <= jlast
             @inline fun((irange, (jstart,)), args...)
             jstart += B

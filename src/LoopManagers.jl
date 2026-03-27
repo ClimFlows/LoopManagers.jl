@@ -65,7 +65,7 @@ to transfer `data` to the device.
     While `KA_GPU` is always available, implementations of [`offload`]
     are available only if the module `KernelAbstractions` is loaded by the main program or its dependencies.
 """
-function KernelAbstractions_GPU end
+abstract type KernelAbstractions_GPU{GPU} <: DeviceManager end
 
 """
     config = GPUConfig(nwarp, repeat)
@@ -112,6 +112,10 @@ struct SRange{step}
         new{step}(start, stop)
     end
 end
+# prevent @vec from applying @simd to an SRange
+ManagedLoops.bulk(range::SRange) = range
+ManagedLoops.tail(::SRange) = ()
+
 I32(x) = unsafe_trunc(UInt32, x)
 
 @inline Base.iterate(range::SRange) = next_warp_index(range, range.start)
